@@ -1,19 +1,36 @@
-function notFound(req, res, next) {
-    res.status(404);
-    const error = new Error(`🔍 - Not Found - ${req.originalUrl}`);
-    next(error);
+const jwt = require('jsonwebtoken')
+const asyncHandler = require('express-async-handler')
+const User = require('../models/userModel')
+
+const protect = asyncHandler(async (req, res, next) => {
+  let token
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    try {
+      // Get token from header
+      token = req.headers.authorization.split(' ')[1]
+
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+
+      // Get user from the token
+      req.user = await User.findById(decoded.id).select('-password')
+
+      next()
+    } catch (error) {
+      console.log(error)
+      res.status(401)
+      throw new Error('Not authorized')
+    }
   }
-  
-  function errorHandler(err, req, res, next) {
-    const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
-    res.status(statusCode);
-    res.json({
-      message: err.message,
-      stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack
-    });
+
+  if (!token) {
+    res.status(401)
+    throw new Error('Not authorized, no token')
   }
-  
-  module.exports = {
-    notFound,
-    errorHandler
-  };    
+})
+
+module.exports = { protect }
